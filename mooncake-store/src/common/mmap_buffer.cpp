@@ -196,6 +196,33 @@ void populate_hugetlb_numa_mapping(void *ptr, size_t total_size,
     touch_numa_mmap_pages(ptr, total_size, hugepage_size, numa_nodes);
 }
 
+void prefault_for_pinning(void *ptr, size_t total_size) {
+    if (ptr == nullptr || total_size == 0) {
+        return;
+    }
+
+    const long page_size = sysconf(_SC_PAGESIZE);
+    if (page_size <= 0) {
+        return;
+    }
+
+    // Only touch memory that is mapped into this process: a CPU store to
+    // accelerator memory (e.g. a cudaMalloc'd VRAM segment) would fault.
+    unsigned char residency = 0;
+    if (mincore(ptr, static_cast<size_t>(page_size), &residency) != 0) {
+        return;
+    }
+
+#ifdef MADV_POPULATE_WRITE
+    // Populate in the kernel; already-resident pages cost a page-table walk.
+    if (madvise(ptr, total_size, MADV_POPULATE_WRITE) == 0) {
+        return;
+    }
+#endif
+
+    touch_mmap_pages(ptr, total_size, static_cast<size_t>(page_size));
+}
+
 void *allocate_buffer_mmap_memory(size_t total_size, size_t alignment) {
     return allocate_buffer_mmap_memory(total_size, alignment, false);
 }
