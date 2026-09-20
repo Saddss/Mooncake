@@ -44,6 +44,11 @@ inline size_t align_up(size_t size, size_t alignment) {
 
 void populate_hugetlb_mapping(void* ptr, size_t total_size);
 
+// Make every page of [ptr, ptr + total_size) resident before the range is
+// handed to cudaHostRegister: registering untouched pages faults them in while
+// the driver lock is held (~70 ms per 256 MiB, ~8 ms when resident).
+void prefault_for_pinning(void* ptr, size_t total_size);
+
 void populate_hugetlb_numa_mapping(void* ptr, size_t total_size,
                                    const std::vector<int>& numa_nodes);
 

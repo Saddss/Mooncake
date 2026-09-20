@@ -140,6 +140,9 @@ std::shared_ptr<RegisteredPinnedRegion> TryPinStoreSegment(
     void *ptr, size_t size, const std::string &protocol,
     const char *segment_owner) {
     if (!IsHostStoreSegmentProtocol(protocol)) return nullptr;
+    // Populate before registering: registration faults untouched pages in
+    // under the driver lock (see prefault_for_pinning).
+    prefault_for_pinning(ptr, size);
     return RegisteredPinnedMemoryManager::instance().try_pin(
         ptr, size,
         std::string("Store segment ") + segment_owner +
